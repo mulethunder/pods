@@ -1,0 +1,40 @@
+# Provide a custom message
+message: ""
+
+# Remember to set service.type=ClusterIP if you are using an ingress
+ingress:
+  configured: false
+  rewritePath: true
+  pathPrefix: ""
+
+service:
+  type: LoadBalancer
+  port: 80
+
+deployment:
+  replicaCount: 1
+  container:
+    image:
+      repository: "mulethunder/hello-microservices-k8s"
+      tag: "2.0" # uses chart appVersion if not provided
+      pullPolicy: IfNotPresent
+    port: 3000
+
+  # Currently only linux images on amd64 architecture are supported - support for arm64 and windows/amd64 coming ...
+  nodeSelector:
+    kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
+
+flexDeployment:
+  agentConfig: /etc/flex-gateway/rtm/UUID_CONFIG.conf
+
+
+ 
+
+
+  resources: {}
+
+  tolerations: []
+
+  affinity: {}
+

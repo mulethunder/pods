@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    meta.helm.sh/release-name: ingress
+    meta.helm.sh/release-namespace: gateway
+  creationTimestamp: "2022-06-06T06:58:10Z"
+  labels:
+    app: ingress-2
+    app.kubernetes.io/managed-by: Helm
+    version: "1"
+  name: ingress-2
+  namespace: gateway
+  resourceVersion: "2419"
+  uid: 1575c380-94d9-4c45-a218-f9c2ecf7acc1
+spec:
+  allocateLoadBalancerNodePorts: true
+  externalTrafficPolicy: Cluster
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    port: 8082
+    protocol: TCP
+    targetPort: 8082
+  selector:
+    app: ingress
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+    - ip: 172.19.0.2

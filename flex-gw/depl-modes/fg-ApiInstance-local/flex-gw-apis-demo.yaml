@@ -1,0 +1,126 @@
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: ApiInstance
+metadata:
+  name: flex-gw-instance
+  namespace: gateway-internal
+spec:
+  address: http://0.0.0.0:8082
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: Service
+metadata:
+  name: payments-fg-service
+  namespace: gateway-internal
+spec:
+  address: http://payments-service.payments.svc:3000/
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: Service
+metadata:
+  name: orders-fg-service
+  namespace: gateway-internal
+spec:
+  address: http://payments-service-2.payments.svc:3001/
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: payments-binding
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: route
+  config:
+    destinationRef:
+      name: payments-fg-service
+  rules:
+  - path: /services(/payments.*)
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: orders-binding
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: route
+  config:
+    destinationRef:
+      name: orders-fg-service
+  rules:
+  - path: /services/orders(/payments.*)
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: payments-policy-auth
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: http-basic-authentication-flex
+  config:
+    username: max
+    password: mule
+  rules:
+    - path: /services(/payments.*)
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: orders-policy-auth
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: http-basic-authentication-flex
+  config:
+    username: max
+    password: mule
+  rules:
+    - path: /services/orders(/payments.*)
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: payments-policy-rate-limit
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: rate-limiting-flex
+  config:
+     keySelector: "#[attributes.method]"
+     exposeHeaders: true
+     rateLimits:
+     - maximumRequests: 5
+       timePeriodInMilliseconds: 5000
+  rules:
+  - path: /services(/payments.*)
+---
+apiVersion: gateway.mulesoft.com/v1alpha1
+kind: PolicyBinding
+metadata:
+  name: orders-policy-rate-limit
+  namespace: gateway-internal
+spec:
+  targetRef:
+    name: flex-gw-instance
+  policyRef:
+    name: rate-limiting-flex
+  config:
+     keySelector: "#[attributes.method]"
+     exposeHeaders: true
+     rateLimits:
+     - maximumRequests: 5
+       timePeriodInMilliseconds: 5000
+  rules:
+  - path: /services/orders(/payments.*)

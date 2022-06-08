@@ -102,7 +102,13 @@
    # Create a cluster calles mycluster with just a single server node:
     #k3d cluster create mycluster
     echo "#################### Create cluster"
-    sudo runuser -l vagrant -c "k3d cluster create flex-gateway-1 --k3s-arg '--disable=traefik@server:*' --port '80:80@server:*' --port '443:443@server:*' --wait --timeout '300s'"
+    # sudo runuser -l vagrant -c "k3d cluster create cluster-fg-ic-conn-1 --k3s-arg '--disable=traefik@server:*' --port '80:80@server:*' --port '443:443@server:*' --wait --timeout '300s'"
+
+    ## Testing creating cluster with port 8081 auto-mapping: (see: https://k3d.io/v5.4.1/usage/exposing_services/)
+    ## INFO[0000] portmapping '8081:8081' targets the loadbalancer: defaulting to [servers:*:proxy agents:*:proxy]
+    sudo runuser -l vagrant -c "k3d cluster create pods-fg-hyb-ic-conn-2-local-c1 --k3s-arg '--disable=traefik@server:*' --port '8081:8081@loadbalancer' --port '8082:8082@loadbalancer' --port '8083:8083@loadbalancer' --wait --timeout '300s'"
+
+    
 
     #### k3d help:
     ## List clusters: k3d cluster list
@@ -129,10 +135,15 @@
     kubectl get nodes
     kubectl get pods -A 
 
-    # Download Flex Gateway docker image:
-    echo "#################### Download Peregrine docker image"
-    docker pull mulesoft/flex-gateway:1.0.0
-    k3d image import -c flex-gateway-1 mulesoft/flex-gateway:1.0.0
+
+    # Let's break gracefully here....
+    exit 0
+
+
+    # Download Flex Gateway docker image (Not needed once being public):
+    # echo "#################### Download Flex Gateway docker images"
+    # docker pull mulesoft/flex-gateway:1.0.0
+    # k3d image import -c flex-gateway-1 mulesoft/flex-gateway:1.0.0
 
     ########## Register Flex Gateway (Local/Connected mode)
     # docker run --entrypoint flexctl -w /registration \
@@ -143,6 +154,7 @@
     # --connected=XXXXXXXX
 
     # Change ownership to vagrant/ubuntu, so that we can read:
+    # sudo chown ubuntu:ubuntu *.conf *.key *.pem
     sudo chown vagrant:vagrant *.conf *.key *.pem
 
     # Create a namespace (if not already):
@@ -166,18 +178,65 @@
     ## Show the helm repo:
     helm repo ls
 
+    ########################
+    ############ Installing Flex Gateway:
+
+    ######
+    #### Layer 1: Flex Gateway as Ingress Controller in Connected Mode:
+
     ## Install Flex-Gateway Helm Chart as Ingress Controller:
     helm -n gateway upgrade -i --wait ingress flex-gateway/flex-gateway \
-    --set registerSecretName=ebb4fede-70eb-487f-ae7d-72a81d29fd5e
+    --set registerSecretName=<secret> \
+    --set service.http.port=8081
 
+    ######
+    #### Layer 2: Flex Gateway as Gateway Instance in Local Mode:
 
+    ## Registering the FG in Local Mode:
 
-    ## Installing Flex-Gateway using Helm Chart but not as an Ingress Controller:
-    # helm -n gateway upgrade -i --wait cloud-api-1 flex-gateway/flex-gateway \
-    # --set service.enabled=false \
-    # --set registerSecretName=<secret> \
-    # --set replicaCount=2 \
-    # --set image.name=077469971775.dkr.ecr.eu-west-1.amazonaws.com/mulesoft/flex-gateway:1.0.0
+    # Create a new namespace for internal FG (if not already):
+    kubectl create namespace gateway-internal
+
+    docker run --entrypoint flexctl -w /registration \
+    -v "$(pwd)":/registration mulesoft/flex-gateway:1.0.0 \
+    register pods-fg-1 \
+    --token=XXXXXXXXX \
+    --organization=XXXXXX \
+    --connected=false
+
+    ## Change ownership to vagrant/ubuntu, so that we can read:
+    # sudo chown ubuntu:ubuntu *.conf *.key *.pem
+    sudo chown vagrant:vagrant *.conf *.key *.pem
+
+    ## Create Secret again:
+    kubectl -n gateway-internal create secret generic XXXXXXXXXX \
+          --from-file=platform.conf=XXXXXXXXXX.conf \
+          --from-file=platform.key=XXXXXXXXXX.key \
+          --from-file=platform.pem=XXXXXXXXXX.pem
+
+    ## Old approach using configMap:
+    kubectl -n gateway-internal create configmap flex-config \
+    --from-file=$UUID.pem \
+    --from-file=$UUID.key \
+    --from-file=$UUID.conf -o yaml --dry-run  | kubectl apply -f -
+
+    # ## Installing Flex-Gateway using Helm Chart but not as an Ingress Controller, but Gateway Instance:
+    helm -n gateway-internal upgrade -i --wait flex-gw flex-gateway/flex-gateway \
+        --set registerSecretName=ca691721-0b1f-43c5-9ae8-1abf27ec34d3 \
+        --set replicaCount=1 \
+        --set autoscaling.enabled=true \
+        --set autoscaling.minReplicas=1 \
+        --set autoscaling.maxReplicas=4 \
+        --set autoscaling.targetCPUUtilizationPercentage=50 \
+        --set autoscaling.targetMemoryUtilizationPercentage=70 \
+        --set resources.limits.cpu=500m \
+        --set resources.limits.memory=256Mi \
+        --set service.enabled=true \
+        --set service.type=ClusterIP \
+        --set service.http.enabled=true \
+        --set service.http.port=8082 \
+        --set service.https.enabled=false
+
 
     ## Verify the IC was created:
     kubectl get apiinstances -n gateway
@@ -202,10 +261,6 @@
 
 
 
-
-
-    # Let's break gracefully here....
-    exit 0
 
 
     
@@ -317,7 +372,9 @@ kubectl -n gateway port-forward svc/ingress 8081:80 --address='0.0.0.0' &
 # apt update && apt install net-tools -y && apt install curl -y
 
 
-
+#########
+#### Adding extra ports in service/ingress: (i.e. Flex Gateway wunning as Ingress Controller in Connected Mode)
+# kubectl edit service/ingress -n gateway
 
 
 # curl localhost:9999/status/gateway/namespaces/default/apiInstances
@@ -332,7 +389,7 @@ kubectl -n gateway port-forward svc/ingress 8081:80 --address='0.0.0.0' &
 ##################
 ######## Testing Payments and ms2 Services:
 
-## Testing agains ext ip address of K3D LB:
+## Testing agains ext ip address of k3d LB:
 ## This worked:
 # curl -u foo:bar 172.18.0.2/api/payments
 # curl -u foo:bar 172.18.0.2/ms2/payments

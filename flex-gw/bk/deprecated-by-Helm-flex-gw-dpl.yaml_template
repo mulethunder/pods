@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flex-gateway-deployment
+  labels:
+    app: flex-gateway
+  namespace: gateway-internal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flex-gateway
+  template:
+    metadata:
+      labels:
+        app: flex-gateway
+    spec:
+      containers:
+        - name: flex-gateway
+          image: mulesoft/flex-gateway:1.0.0
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "0.2"
+            limits:
+              memory: "256Mi"
+              cpu: "1"
+          env:
+            - name: FLEX_RTM_ARM_AGENT_CONFIG
+              value: "/etc/flex-gateway/rtm/ca691721-0b1f-43c5-9ae8-1abf27ec34d3.conf"
+            - name: FLEX_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: FLEX_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: FLEX_DATASOURCE_K8S_ENABLED
+              value: "true"
+            - name: FLEX_K8S_WATCH_NAMESPACE
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: fg-cert
+              mountPath: /etc/flex-gateway/rtm
+              readOnly: true
+      volumes:
+        - name: fg-cert 
+          # secret:
+          #   secretName: <UUID-GOES-HERE>
+          configMap:
+            name: flex-config

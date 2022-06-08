@@ -27,7 +27,7 @@ spec:
               cpu: "1"
           env:
             - name: FLEX_RTM_ARM_AGENT_CONFIG
-              value: "/etc/flex-gateway/rtm/ca691721-0b1f-43c5-9ae8-1abf27ec34d3.conf"
+              value: "/etc/flex-gateway/rtm/<UUID-GOES-HERE>.conf"
             - name: FLEX_NAME
               valueFrom:
                 fieldRef:

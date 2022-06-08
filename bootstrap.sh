@@ -222,7 +222,7 @@
 
     # ## Installing Flex-Gateway using Helm Chart but not as an Ingress Controller, but Gateway Instance:
     helm -n gateway-internal upgrade -i --wait flex-gw flex-gateway/flex-gateway \
-        --set registerSecretName=ca691721-0b1f-43c5-9ae8-1abf27ec34d3 \
+        --set registerSecretName=<UUID-GOES-HERE> \
         --set replicaCount=1 \
         --set autoscaling.enabled=true \
         --set autoscaling.minReplicas=1 \

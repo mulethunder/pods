@@ -29,7 +29,7 @@ spec:
     destinationRef:
       name: payments-fg-service
   rules:
-  - path: /payments(.*)
+  - path: /(payments.*)
 ---
 apiVersion: gateway.mulesoft.com/v1alpha1
 kind: PolicyBinding
@@ -45,7 +45,7 @@ spec:
     username: max
     password: mule
   rules:
-    - path: /payments(.*)
+    - path: /(payments.*)
 ---
 apiVersion: gateway.mulesoft.com/v1alpha1
 kind: PolicyBinding
@@ -64,4 +64,4 @@ spec:
      - maximumRequests: 5
        timePeriodInMilliseconds: 5000
   rules:
-  - path: /payments(.*)
+  - path: /(payments.*)

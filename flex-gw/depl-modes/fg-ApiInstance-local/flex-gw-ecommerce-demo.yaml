@@ -2,10 +2,10 @@
 apiVersion: gateway.mulesoft.com/v1alpha1
 kind: ApiInstance
 metadata:
-  name: flex-gw-instance
+  name: flex-gw-instance-2
   namespace: gateway-internal
 spec:
-  address: http://0.0.0.0:8082
+  address: http://0.0.0.0:9092
 ---
 apiVersion: gateway.mulesoft.com/v1alpha1
 kind: Service

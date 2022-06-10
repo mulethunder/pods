@@ -49,6 +49,61 @@
     docker --version
 
 
+
+    echo "##########################################################################"
+    echo "##################### Installing AWS CLI - Etc #############################"
+    echo "##########################################################################"
+
+
+    ## Download AWS CLI
+    ## AWS doc: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    sudo apt install unzip -y
+    unzip awscliv2.zip
+    sudo ./aws/install
+
+    ## You can now run: /usr/local/bin/aws --version
+
+    # aws configure
+
+    aws eks list-clusters
+    aws eks --region us-west-1 update-kubeconfig --name eks-1654822549
+    ## Added new context arn:aws:eks:us-west-1:567617630570:cluster/eks-1654822549 to /home/vagrant/.kube/config
+
+    ## Manage multiple contexts in kube config (i.e. local k3d and remote aws eks)
+    kubectl config view
+    kubectl config use-context XXXXXX
+        ## Switched to context "arn:aws:eks:us-west-1:567617630570:cluster/eks-1654822549".
+
+    # Error: https://aws.amazon.com/premiumsupport/knowledge-center/eks-api-server-unauthorized-error/
+    # aws sts get-caller-identity
+    # aws eks update-kubeconfig --name eks-1633665351 --region ap-southeast-1
+    # aws eks update-kubeconfig --name eks-cluster-name --region aws-region --role-arn arn:aws:iam::XXXXXXXXXXXX:role/testrole
+
+    # aws eks --region <your-cluster-region> update-kubeconfig --name <your-cluster-name>
+    #   aws eks --region ap-southeast-1 update-kubeconfig --name eks-1633665351
+
+#  echo "##########################################################################"
+#  echo "##################### Installing eksctl ####################################"
+#  echo "##########################################################################"
+
+## Install kubectl
+# curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+# sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+## Install eksctl
+# curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+# sudo mv /tmp/eksctl /usr/local/bin
+
+# Create cluster:
+# ekscluster create cluster --name cri-test-cluster --version 1.17 --region us-west-1 --nodegroup-name linuxnodes --node-type t2.micro --nodes 2
+
+# Delete cluster:
+#eksctl delete cluster --name cri-test-cluster --region us-west-1
+
+
+
+
     echo "##########################################################################"
     echo "############################### Installing FlexGateway #########################"
 
@@ -106,6 +161,7 @@
 
     ## Testing creating cluster with port 8081 auto-mapping: (see: https://k3d.io/v5.4.1/usage/exposing_services/)
     ## INFO[0000] portmapping '8081:8081' targets the loadbalancer: defaulting to [servers:*:proxy agents:*:proxy]
+    ## To open ports in k3d/docker land after cluster is created, see hack here: https://github.com/k3d-io/k3d/issues/89
     sudo runuser -l vagrant -c "k3d cluster create pods-fg-hyb-ic-conn-2-local-c1 --k3s-arg '--disable=traefik@server:*' --port '8081:8081@loadbalancer' --port '8082:8082@loadbalancer' --port '8083:8083@loadbalancer' --wait --timeout '300s'"
 
     
@@ -146,12 +202,12 @@
     # k3d image import -c flex-gateway-1 mulesoft/flex-gateway:1.0.0
 
     ########## Register Flex Gateway (Local/Connected mode)
-    # docker run --entrypoint flexctl -w /registration \
-    # -v "$(pwd)":/registration mulesoft/flex-gateway:1.0.0 \
-    # register XXXXXXXXXX \
-    # --token=XXXXXXXXXXX \
-    # --organization=XXXXXXXXX \
-    # --connected=XXXXXXXX
+    docker run --entrypoint flexctl -w /registration \
+    -v "$(pwd)":/registration mulesoft/flex-gateway:1.0.0 \
+    register XXXXXXXXXX \
+    --token=XXXXXXXXXXX \
+    --organization=XXXXXXXXX \
+    --connected=XXXXXXXX
 
     # Change ownership to vagrant/ubuntu, so that we can read:
     # sudo chown ubuntu:ubuntu *.conf *.key *.pem
@@ -161,10 +217,10 @@
     kubectl create namespace gateway
 
     # Create a Kubernetes secrete from the files:
-    # kubectl -n gateway create secret generic XXXXXXXXXX \
-    # --from-file=platform.conf=XXXXXXXXXX.conf \
-    # --from-file=platform.key=XXXXXXXXXX.key \
-    # --from-file=platform.pem=XXXXXXXXXX.pem
+    kubectl -n gateway create secret generic XXXXXXXXXX \
+    --from-file=platform.conf=XXXXXXXXXX.conf \
+    --from-file=platform.key=XXXXXXXXXX.key \
+    --from-file=platform.pem=XXXXXXXXXX.pem
 
 
     ## Remove any old Flex Gateway Helm repo:
@@ -189,6 +245,9 @@
     --set registerSecretName=<secret> \
     --set service.http.port=8081
 
+    ### If need to delete Helm ingress release:
+    # helm -n gateway delete ingress
+
     ######
     #### Layer 2: Flex Gateway as Gateway Instance in Local Mode:
 
@@ -199,7 +258,7 @@
 
     docker run --entrypoint flexctl -w /registration \
     -v "$(pwd)":/registration mulesoft/flex-gateway:1.0.0 \
-    register pods-fg-1 \
+    register pods-flex-gw-1 \
     --token=XXXXXXXXX \
     --organization=XXXXXX \
     --connected=false
@@ -214,35 +273,31 @@
           --from-file=platform.key=XXXXXXXXXX.key \
           --from-file=platform.pem=XXXXXXXXXX.pem
 
-    ## Old approach using configMap:
-    kubectl -n gateway-internal create configmap flex-config \
-    --from-file=$UUID.pem \
-    --from-file=$UUID.key \
-    --from-file=$UUID.conf -o yaml --dry-run  | kubectl apply -f -
+    # ## Old approach using configMap:
+    # kubectl -n gateway-internal create configmap flex-config \
+    # --from-file=$UUID.pem \
+    # --from-file=$UUID.key \
+    # --from-file=$UUID.conf -o yaml --dry-run  | kubectl apply -f -
 
     # ## Installing Flex-Gateway using Helm Chart but not as an Ingress Controller, but Gateway Instance:
     helm -n gateway-internal upgrade -i --wait flex-gw flex-gateway/flex-gateway \
         --set registerSecretName=<UUID-GOES-HERE> \
-        --set replicaCount=1 \
-        --set autoscaling.enabled=true \
-        --set autoscaling.minReplicas=1 \
-        --set autoscaling.maxReplicas=4 \
-        --set autoscaling.targetCPUUtilizationPercentage=50 \
-        --set autoscaling.targetMemoryUtilizationPercentage=70 \
-        --set resources.limits.cpu=500m \
-        --set resources.limits.memory=256Mi \
+        --set replicaCount=2 \
+        # --set autoscaling.enabled=true \
+        # --set autoscaling.minReplicas=1 \
+        # --set autoscaling.maxReplicas=4 \
+        # --set autoscaling.targetCPUUtilizationPercentage=50 \
+        # --set autoscaling.targetMemoryUtilizationPercentage=70 \
+        # --set resources.limits.cpu=500m \
+        # --set resources.limits.memory=256Mi \
         --set service.enabled=true \
         --set service.type=ClusterIP \
         --set service.http.enabled=true \
         --set service.http.port=8082 \
         --set service.https.enabled=false
 
-
-    ## Verify the IC was created:
-    kubectl get apiinstances -n gateway
-        # NAME            ADDRESS
-        # ingress-https   http://0.0.0.0:443
-        # ingress-http    http://0.0.0.0:80
+    ### If need to delete Helm flex-gw release:
+    # helm -n gateway delete flex-gw
 
     kubectl get crd
         # apiinstances.gateway.mulesoft.com     2022-06-03T05:16:26Z
@@ -250,6 +305,14 @@
         # extensions.gateway.mulesoft.com       2022-06-03T05:16:26Z
         # policybindings.gateway.mulesoft.com   2022-06-03T05:16:26Z
         # services.gateway.mulesoft.com         2022-06-03T05:16:26Z
+
+    ## Verify the IC was created:
+    kubectl get apiinstances -n gateway
+        # NAME            ADDRESS
+        # ingress-https   http://0.0.0.0:443
+        # ingress-http    http://0.0.0.0:80
+
+        
 
     ## List all Services and ApiInstances created and forward the Ingress port to localhost
     echo "#################### List all services and API-instances in -n gateway"
@@ -267,7 +330,6 @@
     # Add Peregrine and Grafana helm repo
     echo "#################### Add Peregrine and Grafana help repo"
     helm repo add grafana https://grafana.github.io/helm-charts \
-    && helm repo add peregrine https://peregrine:48bcfd4617c9cce@d8wbbsqfcfi8u.cloudfront.net/helm \
     && helm repo up
 
     # Forward the Ingress port to localhost and hit it, it should return a 404 response

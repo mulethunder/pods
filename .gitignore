@@ -1,7 +1,7 @@
 .vagrant/
 .git/
 ubuntu-*.log
-ssh/
+ssh/*
 terraform.tfvars
 terraform.tfstate*
 crash.log
@@ -33,6 +33,8 @@ undeploy.sh
 
 *-lock.json
 
-.DS_Store
+**/.DS_Store
 
 pods-server.ssh
+
+runs.txt

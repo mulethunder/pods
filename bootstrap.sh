@@ -293,7 +293,7 @@
         --set service.enabled=true \
         --set service.type=ClusterIP \
         --set service.http.enabled=true \
-        --set service.http.port=8082 \
+        --set service.http.port=9091 \
         --set service.https.enabled=false
 
     ### If need to delete Helm flex-gw release:
@@ -312,7 +312,7 @@
         # ingress-https   http://0.0.0.0:443
         # ingress-http    http://0.0.0.0:80
 
-        
+
 
     ## List all Services and ApiInstances created and forward the Ingress port to localhost
     echo "#################### List all services and API-instances in -n gateway"
